@@ -722,6 +722,24 @@ function findCachedData(
 /**
  * Save tabs data
  */
+function createTabCache(tab: T.Tab): T.TabCache {
+  const info: T.TabCache = { id: tab.id, url: tab.url }
+  if (tab.pinned) info.pin = true
+  if (+tab.parentId > -1) info.parentId = tab.parentId
+  if (tab.panelId !== D.NOID) info.panelId = tab.panelId
+  if (tab.folded) info.folded = tab.folded
+  if (tab.cookieStoreId !== D.CONTAINER_ID) info.ctx = tab.cookieStoreId
+  if (tab.customTitle) info.customTitle = tab.customTitle
+  if (tab.customColor) info.customColor = tab.customColor
+  return info
+}
+
+function createTabsCache(): T.TabCache[] {
+  const data = Tabs.list.map(createTabCache)
+  if (Windows.uniqWinId && data[0]) data[0].uniqWinId = Windows.uniqWinId
+  return data
+}
+
 export function cacheTabsData(delay = 300): void {
   // Logs.info('Tabs.cacheTabsData', delay)
 
