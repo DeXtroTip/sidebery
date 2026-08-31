@@ -113,6 +113,15 @@ let prevSRCheckTimestamp = 0
 let maybeRestoredTabs = null as Tab[] | null
 let maybeRestoredTabsDataQuerying = null as Promise<TabSessionData | undefined>[] | null
 function checkIfSessionIsRestoring(newTab: Tab) {
+  // Ignore tabs with known opener (e.g., middle-click) - not session restore
+  if (
+    newTab.openerTabId !== undefined &&
+    newTab.openerTabId !== D.NOID &&
+    Tabs.byId[newTab.openerTabId]
+  ) {
+    return
+  }
+
   const srCheckTimestamp = performance.now()
   let srCheckTimeDif = 0
   if (prevSRCheckTimestamp !== 0) srCheckTimeDif = srCheckTimestamp - prevSRCheckTimestamp
