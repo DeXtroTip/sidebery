@@ -1493,14 +1493,29 @@ function onTabMoved(id: ID, info: browser.tabs.MoveInfo): void {
 
   if (tab.unpinning) return
 
-  // Move tab in tabs array
+  // Move tab in tabs array - find by id, not by index, to handle out-of-sync cases
   const toTab = Tabs.list[info.toIndex]
-  const movedTab = Tabs.list[info.fromIndex]
-  if (movedTab && movedTab.id === id) {
-    Tabs.list.splice(info.fromIndex, 1)
+  if (!toTab) {
+    Logs.warn(
+      `Tabs.onTabMoved: #${id} ${info.fromIndex} > ${info.toIndex}: destination not found locally`
+    )
+    return
+  }
+
+  let movedTabIndex = info.fromIndex
+  let movedTab = Tabs.list[info.fromIndex]
+  if (!movedTab || movedTab.id !== id) {
+    movedTabIndex = Tabs.list.findIndex(t => t.id === id)
+    if (movedTabIndex === -1) {
+      Logs.warn(
+        `Tabs.onTabMoved: #${id} ${info.fromIndex} > ${info.toIndex}: Not found by id, ignoring`
+      )
+      return
+    }
+    movedTab = Tabs.list[movedTabIndex]
+    Tabs.list.splice(movedTabIndex, 1)
   } else {
-    Logs.err(`Tabs.onTabMoved: #${id} ${info.fromIndex} > ${info.toIndex}: Not found by index`)
-    return Tabs.reinitTabs()
+    Tabs.list.splice(info.fromIndex, 1)
   }
 
   movedTab.moveTime = Date.now()
@@ -1509,8 +1524,8 @@ function onTabMoved(id: ID, info: browser.tabs.MoveInfo): void {
   Tabs.list.splice(info.toIndex, 0, movedTab)
 
   // Update tabs indexes.
-  const minIndex = Math.min(info.fromIndex, info.toIndex)
-  const maxIndex = Math.max(info.fromIndex, info.toIndex)
+  const minIndex = Math.min(movedTabIndex, info.toIndex)
+  const maxIndex = Math.max(movedTabIndex, info.toIndex)
   Tabs.updateTabsIndexes(minIndex, maxIndex + 1)
 
   // Remove badge urgency from old ancestors / panel
