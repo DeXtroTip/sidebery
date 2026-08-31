@@ -730,32 +730,44 @@ export function cacheTabsData(delay = 300): void {
 
   if (cacheTabsDataTimeout) clearTimeout(cacheTabsDataTimeout)
   cacheTabsDataTimeout = setTimeout(() => {
+    cacheTabsDataTimeout = undefined
     if (Tabs.tabsReinitializing) return
     // Logs.info('Tabs.cacheTabsData: Caching...')
-
-    const data = []
-    for (const tab of Tabs.list) {
-      const info: T.TabCache = { id: tab.id, url: tab.url }
-      if (tab.pinned) info.pin = true
-      if (+tab.parentId > -1) info.parentId = tab.parentId
-      if (tab.panelId !== D.NOID) info.panelId = tab.panelId
-      if (tab.folded) info.folded = tab.folded
-      if (tab.cookieStoreId !== D.CONTAINER_ID) info.ctx = tab.cookieStoreId
-      if (tab.customTitle) info.customTitle = tab.customTitle
-      if (tab.customColor) info.customColor = tab.customColor
-      data.push(info)
-    }
-
-    // Set unique window id
-    if (Windows.uniqWinId && data[0]) data[0].uniqWinId = Windows.uniqWinId
-
-    IPC.bg('cacheTabsData', Windows.id, data)
+    IPC.bg('cacheTabsData', Windows.id, createTabsCache())
   }, delay)
 }
 let cacheTabsDataTimeout: number | undefined
 
-export function cancelCachingTabsData() {
+/**
+ * Cancel the pending tab cache write.
+ *
+ * @example cancelCachingTabsData()
+ */
+export function cancelCachingTabsData(): void {
   clearTimeout(cacheTabsDataTimeout)
+  cacheTabsDataTimeout = undefined
+}
+
+/**
+ * Persist the pending tab cache before the sidebar document is hidden.
+ *
+ * @example window.addEventListener('pagehide', flushCachingTabsData)
+ */
+export function flushCachingTabsData(): void {
+  if (!cacheTabsDataTimeout) return
+  clearTimeout(cacheTabsDataTimeout)
+  cacheTabsDataTimeout = undefined
+  if (Tabs.tabsReinitializing || Windows.incognito) return
+  IPC.bg('cacheTabsData', Windows.id, createTabsCache(), 0)
+}
+
+function onVisibilityChange(): void {
+  if (document.visibilityState === 'hidden') flushCachingTabsData()
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', flushCachingTabsData)
+  document.addEventListener('visibilitychange', onVisibilityChange)
 }
 
 const saveTabDataTimeouts = new Map<ID, number>()

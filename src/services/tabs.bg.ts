@@ -526,6 +526,14 @@ function onTabDetached(id: ID, info: browser.tabs.DetachInfo): void {
 }
 
 let cacheTabsDataTimeout: number | undefined
+function saveTabsDataCache(): void {
+  const tabsData: T.TabCache[][] = []
+  for (const cachedTabs of Object.values(Tabs.cacheByWin)) {
+    if (cachedTabs.length) tabsData.push(cachedTabs)
+  }
+  Store.set({ tabsDataCache: tabsData })
+}
+
 export function cacheTabsData(windowId: ID, tabs: T.TabCache[], delay = 300): void {
   if (!tabs) return
   // Logs.info('Tabs.cacheTabsData:', windowId)
@@ -533,14 +541,27 @@ export function cacheTabsData(windowId: ID, tabs: T.TabCache[], delay = 300): vo
   Tabs.cacheByWin[windowId] = tabs
 
   clearTimeout(cacheTabsDataTimeout)
+  if (delay === 0) {
+    cacheTabsDataTimeout = undefined
+    saveTabsDataCache()
+    return
+  }
   cacheTabsDataTimeout = setTimeout(() => {
-    const tabsData = []
-    for (const tabs of Object.values(Tabs.cacheByWin)) {
-      if (tabs.length) tabsData.push(tabs)
-    }
+    cacheTabsDataTimeout = undefined
+    saveTabsDataCache()
+  }, delay) as unknown as number
+}
 
-    Store.set({ tabsDataCache: tabsData })
-  }, delay)
+/**
+ * Persist all pending sidebar tab caches immediately.
+ *
+ * @example flushCacheTabsData()
+ */
+export function flushCacheTabsData(): void {
+  if (!cacheTabsDataTimeout) return
+  clearTimeout(cacheTabsDataTimeout)
+  cacheTabsDataTimeout = undefined
+  saveTabsDataCache()
 }
 
 /**
